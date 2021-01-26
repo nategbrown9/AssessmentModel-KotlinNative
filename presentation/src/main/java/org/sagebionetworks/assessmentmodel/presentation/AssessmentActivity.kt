@@ -11,9 +11,7 @@ import org.sagebionetworks.assessmentmodel.AssessmentProvider
 import org.sagebionetworks.assessmentmodel.navigation.BranchNodeState
 import org.sagebionetworks.assessmentmodel.navigation.CustomBranchNodeStateProvider
 import org.sagebionetworks.assessmentmodel.navigation.FinishedReason
-import org.sagebionetworks.assessmentmodel.resourcemanagement.ModuleInfo
-import org.sagebionetworks.assessmentmodel.resourcemanagement.ModuleInfoProvider
-import org.sagebionetworks.assessmentmodel.resourcemanagement.ResourceInfo
+import org.sagebionetworks.assessmentmodel.resourcemanagement.*
 import org.sagebionetworks.assessmentmodel.serialization.*
 
 open class AssessmentActivity: AppCompatActivity() {
@@ -43,25 +41,13 @@ open class AssessmentActivity: AppCompatActivity() {
         val packageName = intent.getStringExtra(ARG_PACKAGE_NAME) ?: this.packageName
 
         val fileLoader = FileLoaderAndroid(resources, packageName)
-        val assessmentInfo = TransformableAssessmentObject(assessmentId, resourceName)
-        val assessmentGroup = ModuleInfoObject(
-            assessments = listOf(assessmentInfo),
-            packageName = packageName
-        )
-        val defaultResourceInfo = object : ResourceInfo {
-            override var decoderBundle: Any? = null
-            override val bundleIdentifier: String? = null
-            override var packageName: String? = packageName
-        }
-        val moduleInfo = SerializableModuleInfoObject(assessmentGroup)
-        val moduleInfoProvider = object : ModuleInfoProvider {
-            override val fileLoader = fileLoader
-            override val modules: List<ModuleInfo> = listOf(moduleInfo)
-        }
+        val transformableAssessment = TransformableAssessmentObject(assessmentId, resourceName)
+        val moduleInfo = FileModuleInfoObject(listOf(transformableAssessment), packageName)
 
+        val assessmentProvider = FileAssessmentProvider(fileLoader, listOf(moduleInfo))
         // TODO: syoung 01/25/2021 Refactor this to have the activity take the [ModuleInfoProvider] as a setup input.
 
-        viewModel = initViewModel(assessmentInfo, moduleInfoProvider, customBranchNodeStateProvider)
+        viewModel = initViewModel(transformableAssessment, assessmentProvider, customBranchNodeStateProvider)
         viewModel.assessmentLoadedLiveData
             .observe(this, Observer<BranchNodeState>
             { nodeState -> this.handleAssessmentLoaded(nodeState) })

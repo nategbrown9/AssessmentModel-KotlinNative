@@ -1,9 +1,11 @@
 package org.sagebionetworks.assessmentmodel.resourcemanagement
 
+import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.json.Json
 import org.sagebionetworks.assessmentmodel.Assessment
 import org.sagebionetworks.assessmentmodel.AssessmentInfo
 import org.sagebionetworks.assessmentmodel.AssessmentProvider
+import org.sagebionetworks.assessmentmodel.serialization.FileModuleInfoObject
 import org.sagebionetworks.assessmentmodel.serialization.Serialization
 import org.sagebionetworks.assessmentmodel.serialization.TransformableAssessment
 
@@ -38,30 +40,24 @@ interface ModuleInfoProvider : AssessmentProvider {
         }.let {
             (it as SerializableModuleInfo).jsonCoder
         }
+
     }
+}
 
-    /**
-     * Allows the provider to return an [Assessment] (for the given [assessmentInfo]) that is not
-     * encoded as a JSON serialized object.
-     */
-    fun getRegisteredAssessment(assessmentInfo: AssessmentInfo): Assessment? = null
-
-    /**
-     * Can this provider load an assessment associated with the given [AssessmentInfo]?
-     */
+class FileAssessmentProvider(override val fileLoader: FileLoader, override val modules: List<FileModuleInfo>) : ModuleInfoProvider {
     override fun canLoadAssessment(assessmentInfo: AssessmentInfo): Boolean {
-        return modules.any { it.hasAssessment(assessmentInfo) }
+        return modules.find { it.hasAssessment(assessmentInfo) } != null
     }
 
-    /**
-     * Load an [Assessment] based on its [AssessmentInfo].
-     */
     override fun loadAssessment(assessmentInfo: AssessmentInfo): Assessment? {
         return modules.find { it.hasAssessment(assessmentInfo) }?.let { moduleInfo ->
             val assessment = moduleInfo.getAssessment(assessmentInfo)
-            val jsonCoder = (moduleInfo as? SerializableModuleInfo)?.jsonCoder ?: Serialization.JsonCoder.default
+            val jsonCoder = moduleInfo.jsonCoder ?: Serialization.JsonCoder.default
             val resourceInfo = moduleInfo.resourceInfo
-            return assessment!!.unpack(this, resourceInfo, jsonCoder)
+            val serializer = PolymorphicSerializer(Assessment::class)
+            val jsonString = fileLoader.loadFile(assessment!!, resourceInfo)
+            val unpackedNode = jsonCoder.decodeFromString(serializer, jsonString)
+            return unpackedNode.unpack(this, resourceInfo, jsonCoder)
         }
     }
 }

@@ -42,7 +42,7 @@ interface TransformableNode : ContentNode, AssetInfo {
 interface TransformableAssessment : Assessment, TransformableNode {
 
     override fun unpack(moduleInfoProvider: ModuleInfoProvider, resourceInfo: ResourceInfo, jsonCoder: Json): Assessment {
-        val assessment = moduleInfoProvider.getRegisteredAssessment(this)
+        val assessment = moduleInfoProvider.loadAssessment(this)
         return if (assessment != null) assessment else {
             val curResourceInfo = moduleInfoProvider.getRegisteredResourceInfo(this) ?: resourceInfo
             val serializer = PolymorphicSerializer(Assessment::class)
@@ -79,3 +79,18 @@ class SerializableModuleInfoObject(private val moduleInfo: ModuleInfo,
                                    override val jsonCoder: Json = Serialization.JsonCoder.default
 )
     : SerializableModuleInfo, ModuleInfo by moduleInfo
+
+data class FileModuleInfoObject(
+    override val assessments: List<TransformableAssessment>,
+    override var packageName: String? = null,
+    override val bundleIdentifier: String? = null,
+    override val jsonCoder: Json = Serialization.JsonCoder.default
+) : FileModuleInfo, ResourceInfo {
+
+    override val resourceInfo: ResourceInfo
+        get() = this
+
+    @Transient
+    override var decoderBundle: Any? = null
+
+}
